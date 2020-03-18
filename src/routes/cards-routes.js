@@ -13,7 +13,7 @@ const router = new express.Router();
 // Get All the card details
 router.get("/", auth, async (req, res) => {
   try {
-    await req.user.populate().execPopulate();
+    await req.user.populate("cards").execPopulate();
     console.log(req.user.cards);
     res.send(req.user.cards);
   } catch (e) {
@@ -74,7 +74,7 @@ router.post("/new", auth, async (req, res) => {
     await card.save();
     res.status(201).send(card);
   } catch (e) {
-    res.status(400).send(e);
+    res.status(400).send("Error" + e);
   }
 });
 // var storage = multer.memoryStorage();
@@ -100,14 +100,28 @@ router.post(
       const userEmail = req.body.email;
       const userSnap = req.file.buffer;
       const userPassphrase = req.body.passphrase;
-      const revealed = steggy.reveal()(userSnap);
-      console.log(revealed.toString());
+      const cardName = req.body.cardname;
+      // const revealed = steggy.reveal()(userSnap);
+      // console.log(revealed.toString());
       const user = await User.findOne({ email: userEmail });
-      console.log(user.cards);
-      console.log(userEmail, userPassphrase);
-      res.send(user);
-    } catch (e) {
-      res.send(e);
+      // await user.populate("cards").execPopulate();
+      const [card, info] = await cardDetails.findByCredentials(
+        user._id,
+        cardName,
+        req.file.buffer,
+        req.body.passphrase
+      );
+      console.log(card);
+
+      const checker = card.card_details_user_snap;
+      const totalSnap = checker + info;
+      const priv = card.card_details_private_key;
+      const sendIt = JSON.parse(
+        CryptoJS.TripleDES.decrypt(totalSnap, priv).toString(CryptoJS.enc.Utf8)
+      );
+      res.send(sendIt);
+    } catch (err) {
+      res.status(500).send("" + err);
     }
   },
   (error, req, res, next) => {
